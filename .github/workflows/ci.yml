@@ -1,0 +1,161 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  TOPO_CORE_REF: main
+  TOPO_LANG_REF: main
+
+jobs:
+  # ── Build + test against an installed topo-core ────────
+  # topo-v8 ships the V8-family shared layer (TsServer LSP bridge,
+  # V8Codegen, debug adapters) consumed by topo-lang-typescript and
+  # (eventually) topo-lang-javascript.
+  build-and-test:
+    name: build + test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, windows-2022]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build deps (linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build
+
+      - name: Install build deps (macos)
+        if: runner.os == 'macOS'
+        run: brew install ninja
+
+      - name: Export GHA cache env (for vcpkg x-gha backend)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgGitCommitId: "56bb2411609227288b70117ead2c47585ba07713"
+
+      # topo-v8 links topo::core::TopoTranspile, which is only emitted into
+      # the topo-core install set when TOPO_CORE_WITH_LANG flips ON — i.e.,
+      # topo-lang is discoverable. Do the same 3-step bootstrap the language
+      # repos do: install lang-less topo-core → install topo-lang → re-install
+      # topo-core with-lang.
+      - name: Cache upstream topo install
+        id: upstream-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/topo-install
+          key: topo-core-${{ env.TOPO_CORE_REF }}-lang-${{ env.TOPO_LANG_REF }}-${{ matrix.os }}-v2
+
+      - name: Build & install topo-core (zero-LLVM, lang-less)
+        if: steps.upstream-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "${TOPO_CORE_REF}" \
+              https://github.com/topo-lang/topo-core.git \
+              "${RUNNER_TEMP}/topo-core-src"
+          cmake -S "${RUNNER_TEMP}/topo-core-src" \
+                -B "${RUNNER_TEMP}/topo-core-build" \
+                -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX="${RUNNER_TEMP}/topo-install" \
+                -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          cmake --build "${RUNNER_TEMP}/topo-core-build" --target install
+
+      - name: Build & install topo-lang
+        if: steps.upstream-cache.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --branch "${TOPO_LANG_REF}" \
+              https://github.com/topo-lang/topo-lang.git \
+              "${RUNNER_TEMP}/topo-lang-src"
+          cmake -S "${RUNNER_TEMP}/topo-lang-src" \
+                -B "${RUNNER_TEMP}/topo-lang-build" \
+                -G Ninja -DCMAKE_BUILD_TYPE=Release \
+                -DCMAKE_INSTALL_PREFIX="${RUNNER_TEMP}/topo-install" \
+                -DCMAKE_PREFIX_PATH="${RUNNER_TEMP}/topo-install" \
+                -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          cmake --build "${RUNNER_TEMP}/topo-lang-build" --target install
+
+      - name: Re-install topo-core (with-lang)
+        if: steps.upstream-cache.outputs.cache-hit != 'true'
+        run: |
+          cmake -S "${RUNNER_TEMP}/topo-core-src" \
+                -B "${RUNNER_TEMP}/topo-core-build" \
+                -DCMAKE_PREFIX_PATH="${RUNNER_TEMP}/topo-install"
+          cmake --build "${RUNNER_TEMP}/topo-core-build" --target install
+
+      - name: Configure topo-v8
+        run: |
+          cmake -S . -B build -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DCMAKE_PREFIX_PATH="${RUNNER_TEMP}/topo-install" \
+              -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure --timeout 120
+
+      - name: Install topo-v8
+        run: cmake --install build --prefix "${RUNNER_TEMP}/v8-install"
+
+      - name: find_package smoke
+        run: |
+          mkdir -p "${RUNNER_TEMP}/find-package-smoke"
+          cd "${RUNNER_TEMP}/find-package-smoke"
+          # The smoke project needs its own vcpkg manifest: the installed
+          # package's Config.cmake chain transitively requires nlohmann_json,
+          # so the consumer must arrange for that dep itself. Pinning the
+          # same builtin-baseline reuses the cached vcpkg build.
+          cat > vcpkg.json <<'JSON'
+          {
+            "name": "find-package-smoke",
+            "version-string": "0.0.0",
+            "builtin-baseline": "56bb2411609227288b70117ead2c47585ba07713",
+            "dependencies": ["nlohmann-json"]
+          }
+          JSON
+          cat > CMakeLists.txt <<'CMAKE'
+          cmake_minimum_required(VERSION 3.20)
+          project(topo-v8-find-package-smoke LANGUAGES CXX)
+          find_package(topo-v8 CONFIG REQUIRED)
+          add_executable(smoke smoke.cpp)
+          target_link_libraries(smoke PRIVATE topo::v8::TopoV8Codegen)
+          if(MINGW)
+              target_link_options(smoke PRIVATE -static -static-libgcc -static-libstdc++)
+          endif()
+          CMAKE
+          cat > smoke.cpp <<'CPP'
+          // topo-v8 exports each per-module include subdir (e.g.
+          // include/topo-v8/Codegen) on INSTALL_INTERFACE — same
+          // convention monorepo consumers use — so headers resolve as
+          // unqualified names.
+          #include "V8Codegen.h"
+          int main() {
+              // Confirms the V8 codegen header + lib link cleanly via
+              // topo-v8 install + topo-core transitive deps.
+              return 0;
+          }
+          CPP
+          cmake -S . -B build -G Ninja \
+              -DCMAKE_PREFIX_PATH="${RUNNER_TEMP}/v8-install;${RUNNER_TEMP}/topo-install" \
+              -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+          cmake --build build
+          ./build/smoke

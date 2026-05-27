@@ -1,0 +1,11 @@
+{
+  "name": "@topo/containment-guard-transform",
+  "version": "0.1.0",
+  "description": "Topo ContainmentGuardPass AST transform for TypeScript",
+  "type": "module",
+  "main": "index.mjs",
+  "license": "MIT",
+  "dependencies": {
+    "typescript": "^5.0.0"
+  }
+}

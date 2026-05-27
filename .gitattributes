@@ -1,0 +1,53 @@
+# Auto-detect text files and normalize line endings
+* text=auto
+
+# Source code — always LF
+*.cpp text eol=lf
+*.h text eol=lf
+*.hpp text eol=lf
+*.c text eol=lf
+*.java text eol=lf
+*.py text eol=lf
+*.rs text eol=lf
+*.topo text eol=lf
+
+# Build / config
+*.cmake text eol=lf
+*.toml text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+CMakeLists.txt text eol=lf
+Makefile text eol=lf
+
+# Scripts
+*.sh text eol=lf
+*.bash text eol=lf
+*.zsh text eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Documentation
+*.md text eol=lf
+*.txt text eol=lf
+LICENSE text eol=lf
+
+# Gradle (JVM backend)
+*.gradle text eol=lf
+*.gradle.kts text eol=lf
+gradlew text eol=lf
+gradlew.bat text eol=crlf
+
+# Binary — no conversion
+*.png binary
+*.jpg binary
+*.ico binary
+*.jar binary
+*.class binary
+*.o binary
+*.a binary
+*.so binary
+*.dylib binary
+*.dll binary
+*.exe binary

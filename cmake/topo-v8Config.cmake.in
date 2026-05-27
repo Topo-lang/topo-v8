@@ -1,0 +1,21 @@
+@PACKAGE_INIT@
+
+# topo-v8 CMake package config.
+#
+# Re-exports four library targets (TopoV8TsServer, TopoV8AstExtract,
+# TopoV8Codegen, TopoV8Debug) under namespace topo::v8::, plus the
+# convenience Topov8Placeholder INTERFACE that pulls in TsServer +
+# AstExtract + Codegen together.
+
+include(CMakeFindDependencyMacro)
+
+# Required upstream Topo package — provides topo::core::TopoLSPBridge,
+# TopoCheck, TopoTranspile, TopoProfile.
+find_dependency(topo-core CONFIG)
+
+# topo-v8's TopoV8Debug PUBLIC-links nlohmann_json::nlohmann_json.
+find_dependency(nlohmann_json CONFIG)
+
+include("${CMAKE_CURRENT_LIST_DIR}/topo-v8Targets.cmake")
+
+check_required_components(topo-v8)

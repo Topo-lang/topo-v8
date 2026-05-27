@@ -1,0 +1,64 @@
+{
+  "$comment": "Machine-readable identity manifest for the topo-v8 backend slot. Operational planning is governed by Plan 37 (track-based; no global startup gates). Not consumed by build today — exists so any tooling that walks topo-<backend>/ directories can answer 'what is this' and 'what's live'.",
+  "name": "topo-v8",
+  "kind": "backend-ecosystem",
+  "language": "typescript",
+  "status": "active",
+  "$status_meaning": "lib/ shared AST infrastructure live; Track A complete (visibility + containment-guard + stage-assert all shipped 2026-05-11). Track T transpile-source extractor delivered 2026-05-16 (topo-extract-typescript, MVP). Track A's by-design correctness-pass candidates are exhausted — new candidates require a Plan 37 update first. Perf / FFI tracks open by demand.",
+  "tool": {
+    "$comment": "Separate v8-specific build backend is NOT implemented and not planned ahead. TS routes to the check-only topo-build-typescript; that backend orchestrates per-pass tools via [transforms.<name>] config. A second backend would only be considered if a single pass became too complex for the check-only driver to host (Plan 37 §4).",
+    "name": "topo-build-v8-typescript",
+    "implemented": false
+  },
+  "contract_passes": {
+    "$comment": "Correctness-enforcement passes (Plan 37 Track A). Each lands as topo-v8/tools/<name>/ + a [transforms.<name>] config knob in topo-build-typescript.",
+    "visibility": {
+      "tool": "tools/visibility-transform/",
+      "implemented": true,
+      "wired_into": "topo-build-typescript via [transforms.visibility].mode",
+      "since": "2026-05-11"
+    },
+    "containment_guard": {
+      "tool": "tools/containment-guard-transform/",
+      "implemented": true,
+      "wired_into": "topo-build-typescript via [transforms.containment_guard].mode",
+      "since": "2026-05-11"
+    },
+    "stage_assert": {
+      "tool": "tools/stage-assert-transform/",
+      "implemented": true,
+      "wired_into": "topo-build-typescript via [transforms.stage_assert].mode",
+      "since": "2026-05-11"
+    }
+  },
+  "transpile_source": {
+    "$comment": "Plan 37 Track T. The transpile-source extractor lifts TS into a TranspileModule so TS can be a `topo-transpile --from typescript` source. Lives in the per-language package (not topo-v8/tools/) because it is a topo-check/extractor sibling to topo-extract-cpp/rust/java, not a correctness-rewrite pass. Node-backed; resolved by the bare name topo-extract-typescript via a launcher staged beside topo-build-typescript.",
+    "tool": "../topo-lang-typescript/topo-check/extractor/",
+    "name": "topo-extract-typescript",
+    "implemented": true,
+    "scope": "MVP — fn/method decls, params, return type, vardecl/assign/return/if/for/while, binary/unary ops, calls, member access, index, literals, self-update for-incrementor; async/await, decorators, generic constraints, destructuring, unions recorded to function `unsupported` with downgraded fidelity (never silently dropped)",
+    "since": "2026-05-16"
+  },
+  "plan": {
+    "planning": ".aidesk/live/30-planning/37-typescript-declaration-enforcement-tracks.md",
+    "superseded_planning": ".aidesk/archived/planning/36-topo-v8-backend.md",
+    "infra_relocation": ".aidesk/archived/planning/35-topo-v8-shared-v8-ast-infra-relocation.md",
+    "proposal": ".aidesk/live/20-proposal/typescript-v8-support.md"
+  },
+  "artifacts_present": [
+    "prototypes/visibility-pass/",
+    "lib/TsServer/",
+    "lib/Check/Extract/",
+    "lib/Codegen/",
+    "tools/visibility-transform/",
+    "tools/containment-guard-transform/",
+    "tools/stage-assert-transform/"
+  ],
+  "artifacts_open_tracks": {
+    "$comment": "Per Plan 37 these are not pre-scaffolded. They land when the corresponding Track's trigger fires. Track A's correctness-pass list is empty: the three originally-listed candidates (visibility / containment-guard / stage-assert) have all shipped; future Track A candidates require a Plan 37 update first.",
+    "track_A_next_correctness_passes": [],
+    "track_B_perf_first_pass": ["benchmarks/<workload>/"],
+    "track_C_first_runtime_npm": ["runtime-glue/<helper>/"],
+    "track_D_first_ffi_use_case": ["ffi-contracts/", "examples/typescript/ffi-demo/"]
+  }
+}

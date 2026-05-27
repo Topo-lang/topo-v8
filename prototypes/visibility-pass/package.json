@@ -1,0 +1,14 @@
+{
+  "name": "@topo/visibility-pass-prototype",
+  "private": true,
+  "version": "0.0.0-prototype",
+  "description": "Historical AST-level VisibilityPass prototype using the typescript Compiler API. Superseded by topo-v8/tools/visibility-transform/ (production). Kept as a minimal teaching sample of the rewrite path; not production-mergeable scaffolding.",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "test": "node --test test.mjs"
+  },
+  "dependencies": {
+    "typescript": "^5.4.0"
+  }
+}

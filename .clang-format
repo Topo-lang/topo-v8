@@ -1,0 +1,35 @@
+Language: Cpp
+BasedOnStyle: Google
+ColumnLimit: 120
+IndentWidth: 4
+AccessModifierOffset: -4
+
+# Brace style
+BreakBeforeBraces: Attach
+
+# Short forms — keep what AI reads as clear patterns
+AllowShortBlocksOnASingleLine: Empty
+AllowShortCaseLabelsOnASingleLine: true
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: Inline
+
+# One parameter per line — precise diffs, clear signatures
+BinPackParameters: false
+BinPackArguments: false
+
+# Alignment
+AlignAfterOpenBracket: Align
+
+# Include ordering — preserve existing grouping
+IncludeBlocks: Preserve
+SortIncludes: Never
+
+# Indentation
+ContinuationIndentWidth: 4
+NamespaceIndentation: None
+IndentCaseLabels: false
+
+# Trailing comments — match existing style (1 space, not Google's 2)
+SpacesBeforeTrailingComments: 1

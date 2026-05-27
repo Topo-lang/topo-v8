@@ -1,0 +1,57 @@
+# EditorConfig — https://editorconfig.org
+# Shared across every spun-out topo-* repo. Tracks .clang-format for C++ and
+# the per-language conventions the toolchain already exercises.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+# CMake / JSON / YAML / TOML — 2-space (CMake convention; matches existing
+# CMakeLists.txt in every topo-* repo)
+[*.{cmake,json,yaml,yml,toml}]
+indent_size = 2
+
+[CMakeLists.txt]
+indent_size = 2
+
+# C / C++ — 4-space (matches the project .clang-format IndentWidth: 4)
+[*.{c,h,cpp,hpp,cc,hh,cxx}]
+indent_size = 4
+
+# Rust — 4-space, rustfmt default
+[*.rs]
+indent_size = 4
+
+# Java — 4-space (Google Java Style baseline used by the JVM backend)
+[*.java]
+indent_size = 4
+
+# Python — 4-space, PEP-8
+[*.py]
+indent_size = 4
+
+# TypeScript / JavaScript — 2-space (tsserver / prettier default)
+[*.{ts,tsx,js,jsx,mjs,cjs}]
+indent_size = 2
+
+# Shell — 2-space (consistent with project scripts/)
+[*.sh]
+indent_size = 2
+
+# Markdown — preserve trailing spaces (line breaks)
+[*.md]
+trim_trailing_whitespace = false
+indent_size = 2
+
+# Makefiles need real tabs
+[Makefile]
+indent_style = tab
+
+# Windows-only scripts keep CRLF (matches .gitattributes eol=crlf)
+[*.{bat,cmd,ps1}]
+end_of_line = crlf

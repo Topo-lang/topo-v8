@@ -1,0 +1,41 @@
+# Build directories
+/build/
+/build-*/
+/out/
+/cmake-build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+*.cmake.gen
+
+# Compiled objects
+*.o
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+
+# Editor / IDE
+.vscode/
+.idea/
+.vs/
+*.swp
+*.swo
+*~
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Python (test scratch only)
+__pycache__/
+*.pyc
+
+# vcpkg
+vcpkg_installed/

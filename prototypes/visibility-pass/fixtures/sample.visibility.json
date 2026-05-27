@@ -1,0 +1,6 @@
+{
+  "publicApi": "public",
+  "internalHelper": "internal",
+  "privateImpl": "private",
+  "PUBLIC_CONST": "public"
+}
