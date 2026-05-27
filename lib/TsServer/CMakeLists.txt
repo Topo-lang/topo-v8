@@ -8,6 +8,10 @@
 add_library(TopoV8TsServer STATIC
     TsServerBridge.cpp
 )
+# Canonical install-export namespace alias (must match install(EXPORT topo-v8Targets
+# NAMESPACE topo::v8::) — what find_package consumers see). The shorthand
+# `topo::v8::TsServer` alias above is kept for in-tree convenience.
+add_library(topo::v8::TopoV8TsServer ALIAS TopoV8TsServer)
 add_library(topo::v8::TsServer ALIAS TopoV8TsServer)
 
 target_include_directories(TopoV8TsServer

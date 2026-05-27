@@ -8,6 +8,9 @@
 add_library(TopoV8Codegen STATIC
     V8Codegen.cpp
 )
+# Canonical install-export namespace alias (must match install(EXPORT topo-v8Targets
+# NAMESPACE topo::v8::)).
+add_library(topo::v8::TopoV8Codegen ALIAS TopoV8Codegen)
 add_library(topo::v8::Codegen ALIAS TopoV8Codegen)
 
 target_include_directories(TopoV8Codegen

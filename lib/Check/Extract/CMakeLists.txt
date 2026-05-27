@@ -14,6 +14,9 @@ add_library(TopoV8AstExtract STATIC
     TypeScriptCallEdgeExtractor.cpp
     TypeScriptSymbolAccessExtractor.cpp
 )
+# Canonical install-export namespace alias (must match install(EXPORT topo-v8Targets
+# NAMESPACE topo::v8::)).
+add_library(topo::v8::TopoV8AstExtract ALIAS TopoV8AstExtract)
 add_library(topo::v8::AstExtract ALIAS TopoV8AstExtract)
 
 target_include_directories(TopoV8AstExtract

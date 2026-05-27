@@ -41,5 +41,8 @@ function(topo_set_compiler_flags target)
 endfunction()
 
 # Stub for monorepo PCH helper that some lib CMakeLists may call.
-function(topo_apply_std_pch target)
-endfunction()
+if(NOT COMMAND topo_apply_std_pch)
+    function(topo_apply_std_pch target)
+        # standalone no-op
+    endfunction()
+endif()

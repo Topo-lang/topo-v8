@@ -10,6 +10,9 @@
 add_library(TopoV8Debug STATIC
     SourceMapResolver.cpp
 )
+# Canonical install-export namespace alias (must match install(EXPORT topo-v8Targets
+# NAMESPACE topo::v8::)).
+add_library(topo::v8::TopoV8Debug ALIAS TopoV8Debug)
 add_library(topo::v8::Debug ALIAS TopoV8Debug)
 
 target_include_directories(TopoV8Debug

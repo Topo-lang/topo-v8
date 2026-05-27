@@ -38,7 +38,9 @@ include(TopoV8CompilerFlags)
 # (TopoTranspile in topo-core is gated on topo-lang being available; if
 # the upstream topo-core was built without topo-lang on the prefix path,
 # TopoTranspile is absent and topo-v8's Codegen lib will fail to link.)
-find_package(topo-core CONFIG REQUIRED)
+if(NOT TARGET topo::core::TopoBasic)
+    find_package(topo-core CONFIG REQUIRED)
+endif()
 
 # ── External dependencies ─────────────────────────────
 find_package(nlohmann_json CONFIG REQUIRED)
@@ -50,6 +52,10 @@ add_subdirectory(lib)
 # structural dependency edges from language plugins. Now re-exports
 # the real V8 infrastructure libraries.
 add_library(Topov8Placeholder INTERFACE)
+# Canonical install-export namespace alias (must match install(EXPORT topo-v8Targets
+# NAMESPACE topo::v8::) — this is the form downstream find_package sees and
+# the sentinel target the meta-repo's dual-mode guard checks for).
+add_library(topo::v8::Topov8Placeholder ALIAS Topov8Placeholder)
 add_library(topo::v8::Placeholder ALIAS Topov8Placeholder)
 target_link_libraries(Topov8Placeholder INTERFACE
     TopoV8TsServer
