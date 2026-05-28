@@ -39,12 +39,6 @@
     "scope": "MVP — fn/method decls, params, return type, vardecl/assign/return/if/for/while, binary/unary ops, calls, member access, index, literals, self-update for-incrementor; async/await, decorators, generic constraints, destructuring, unions recorded to function `unsupported` with downgraded fidelity (never silently dropped)",
     "since": "2026-05-16"
   },
-  "plan": {
-    "planning": ".aidesk/live/30-planning/37-typescript-declaration-enforcement-tracks.md",
-    "superseded_planning": ".aidesk/archived/planning/36-topo-v8-backend.md",
-    "infra_relocation": ".aidesk/archived/planning/35-topo-v8-shared-v8-ast-infra-relocation.md",
-    "proposal": ".aidesk/live/20-proposal/typescript-v8-support.md"
-  },
   "artifacts_present": [
     "prototypes/visibility-pass/",
     "lib/TsServer/",
