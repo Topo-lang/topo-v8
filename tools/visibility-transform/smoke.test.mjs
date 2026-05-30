@@ -172,7 +172,7 @@ test("invalid JSON yields success=false with error", () => {
     }
 });
 
-// Audit issue node-transform-tools-no-input-size-limit: ensure the
+// Input-size cap: ensure the
 // per-file content cap fires as a structured error rather than letting
 // JSON.parse OOM on a multi-GB string. Drive the cap down with
 // TOPO_V8_TRANSFORM_MAX_FILE_CONTENT_BYTES so the test stays cheap.
@@ -207,7 +207,7 @@ test("oversize per-file content yields structured size-cap error", () => {
     }
 });
 
-// Audit issue node-transform-tools-no-input-size-limit: the input-size
+// Input-size cap: the input-size
 // cap fires before JSON.parse, so a giant request file is rejected on
 // stat rather than read into memory.
 test("oversize input file yields structured input-size error", () => {

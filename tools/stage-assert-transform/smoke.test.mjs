@@ -73,7 +73,7 @@ test("non-mapped function is untouched", () => {
 });
 
 test("user-bound __topoStage forces hashed counter identifier", () => {
-    // Pins issue stage-assert-transform-injected-identifiers-collide-silently.
+    // Regression: injected counter identifiers must not silently collide with user bindings.
     // When the user's function body already binds __topoStage, the
     // transform must rename the injected counter to a hashed form
     // instead of silently shadowing the user's binding.
@@ -165,7 +165,7 @@ test("no collision keeps the bare identifier names", () => {
 });
 
 test("parameter named __topoStage forces hashed counter identifier", () => {
-    // Pins issue stage-assert-collision-misses-function-parameters.
+    // Regression: collision scan must include function parameters, not just the body.
     // Before the fix, chooseInjectedIdentifiers walked only the function
     // body when scanning for collisions with the default injected names
     // — a function that took __topoStage as a parameter still received a

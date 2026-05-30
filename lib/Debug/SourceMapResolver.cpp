@@ -3,7 +3,7 @@
 // VLQ-base64 decoding is implemented inline to avoid pulling in a
 // dedicated dependency. The mapping segment grammar is a sequence of
 // 1, 4, or 5 VLQ integers separated by `,` within a line and `;`
-// between generated lines. We decode strictly per the §4.1 spec and
+// between generated lines. We decode strictly per the Source Map v3 spec
 // surface any structural inconsistency as a parse failure (cached as
 // `ok = false`).
 

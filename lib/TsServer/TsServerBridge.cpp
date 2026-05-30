@@ -25,7 +25,7 @@ TsServerBridge::TsServerBridge() : LSPBridge("[tsserver] ") {}
 bool TsServerBridge::isTsServerAvailable() {
     namespace plat = topo::platform;
     std::string exe = "typescript-language-server" + std::string(plat::ExeSuffix);
-    // Audit issue ``tsserver-bridge-uses-system-shell-for-version-probe``:
+    // Shell-probe hardening:
     // the previous probe composed a shell command (``"exe" --version > /dev/null
     // 2>&1``) and called ``std::system``. That spawned a shell with quoted-
     // path semantics, duplicated POSIX/Windows redirection syntax across an

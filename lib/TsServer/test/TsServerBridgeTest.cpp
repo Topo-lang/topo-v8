@@ -13,7 +13,8 @@
 //      (`.ts` / `.tsx` class / interface / type alias). Reachable when
 //      isAvailable() returns false, i.e. the bridge was never started.
 //
-// Issue: tsserver-bridge-no-unit-tests-only-integration.
+// These slices give in-process coverage to logic that the live-tsserver
+// integration suite cannot reliably exercise on its own.
 
 #include "TsServerBridge.h"
 

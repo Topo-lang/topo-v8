@@ -41,8 +41,8 @@ public:
     ///   4. `MarkedString[]`  — typescript-language-server's common shape
     ///
     /// Exposed as a static helper so unit tests can exercise each shape
-    /// without spawning a real tsserver subprocess (issue
-    /// `tsserver-bridge-no-unit-tests-only-integration`). Returns
+    /// without spawning a real tsserver subprocess — otherwise this
+    /// parsing logic would have only integration coverage. Returns
     /// nullopt when the node shape is none of the above or the array
     /// is empty.
     static std::optional<std::string> extractHoverString(const json& contents);

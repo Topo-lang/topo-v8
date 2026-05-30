@@ -14,10 +14,9 @@
 // topo-v8/lib/Check/Extract/ and the symbols are header-defined
 // `inline` so the linker does not see duplicates across translation
 // units). Each extractor keeps its own per-extractor regex patterns;
-// only the genuinely shared scanning primitives live here.
-//
-// Issue: typescript-extractors-duplicate-scope-tracking-helpers
-//   — pins the rationale and the call sites.
+// only the genuinely shared scanning primitives live here. Consolidating
+// the duplicated scope-tracking helpers removes the lock-step-update
+// hazard the per-extractor copies created.
 
 #ifndef TOPO_V8_LIB_CHECK_EXTRACT_V8_SOURCE_SCANNER_H
 #define TOPO_V8_LIB_CHECK_EXTRACT_V8_SOURCE_SCANNER_H

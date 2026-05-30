@@ -446,7 +446,7 @@ function processRequest(request) {
 // Main — accepts JSON file path as argv[1], or reads from stdin
 // ---------------------------------------------------------------------------
 
-// Input size caps (audit issue node-transform-tools-no-input-size-limit).
+// Input size caps (guard against unbounded transform input).
 // See visibility-transform/index.mjs for the rationale; the caps and env
 // names are deliberately shared across the three V8 transform tools so a
 // user setting one env var lifts the cap on all three uniformly.

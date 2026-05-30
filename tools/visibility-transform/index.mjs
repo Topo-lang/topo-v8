@@ -235,7 +235,7 @@ function processRequest(request) {
 // Main — accepts JSON file path as argv[1], or reads from stdin
 // ---------------------------------------------------------------------------
 
-// Input size caps (audit issue node-transform-tools-no-input-size-limit).
+// Input size caps (guard against unbounded transform input).
 // Each cap is overridable via env so a legitimately large megaproject build
 // can lift the bound; the cap defaults exist only so a runaway/malicious
 // input surfaces as a structured error instead of an OOM crash.

@@ -273,8 +273,8 @@ function rewriteBody(context, fnNode, fnName, calleeToStage, changes) {
 
     // Inject  let <counter> = 0;  at the very top. The counter name is
     // the hashed form when the user body already binds __topoStage; see
-    // chooseInjectedIdentifiers and issue
-    // stage-assert-transform-injected-identifiers-collide-silently.
+    // chooseInjectedIdentifiers. Using a fixed name here would silently
+    // collide with a user binding of the same identifier.
     const prologue = factory.createVariableStatement(
         /*modifiers*/ undefined,
         factory.createVariableDeclarationList(
@@ -419,7 +419,7 @@ function processRequest(request) {
 // Main — accepts JSON file path as argv[1], or reads from stdin
 // ---------------------------------------------------------------------------
 
-// Input size caps (audit issue node-transform-tools-no-input-size-limit).
+// Input size caps (guard against unbounded transform input).
 // See visibility-transform/index.mjs for the rationale; the caps and env
 // names are deliberately shared across the three V8 transform tools so a
 // user setting one env var lifts the cap on all three uniformly.
