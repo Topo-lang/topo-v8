@@ -48,6 +48,31 @@ find_package(nlohmann_json CONFIG REQUIRED)
 # ── Library layer ─────────────────────────────────────
 add_subdirectory(lib)
 
+# ── Tests (self-gated) ────────────────────────────────
+# The lib/TsServer/test (15 cases) and lib/Debug/test (7 cases) suites used to
+# run ONLY in the meta full-stack build (via the meta-root's explicit
+# add_subdirectory) — the per-repo public CI built topo-v8 with no tests and
+# passed green ("No tests were found!!!"). This self-gate lets the standalone
+# CI run the 22 cases. It stays DORMANT in the meta build (TOPO_V8_BUILD_TESTS
+# defaults OFF there, so the meta's explicit adds remain the single source —
+# no double-add).
+option(TOPO_V8_BUILD_TESTS "Build topo-v8 tests" OFF)
+if(TOPO_V8_BUILD_TESTS AND (PROJECT_IS_TOP_LEVEL OR TOPO_META_DRIVING_TESTS))
+    enable_testing()
+    # Meta-embedded mode reuses the meta's googletest; only fetch standalone.
+    if(NOT TARGET GTest::gtest_main)
+        include(FetchContent)
+        FetchContent_Declare(googletest
+            URL https://github.com/google/googletest/archive/refs/tags/v1.15.2.tar.gz)
+        set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(googletest)
+    endif()
+    set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
+    include(GoogleTest)
+    add_subdirectory(lib/TsServer/test)
+    add_subdirectory(lib/Debug/test)
+endif()
+
 # Topov8Placeholder — historically a no-op INTERFACE library for
 # structural dependency edges from language plugins. Now re-exports
 # the real V8 infrastructure libraries.

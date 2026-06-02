@@ -104,6 +104,7 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja \
               -DCMAKE_BUILD_TYPE=Release \
+              -DTOPO_V8_BUILD_TESTS=ON \
               -DCMAKE_PREFIX_PATH="${RUNNER_TEMP}/topo-install" \
               -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
 
@@ -111,7 +112,10 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        run: ctest --test-dir build --output-on-failure --timeout 120
+        # --no-tests=error: a 0-tests build FAILS (no silent 0-tests green).
+        # TOPO_V8_BUILD_TESTS=ON registers the 22 TsServer + Debug cases that
+        # the standalone CI previously never built.
+        run: ctest --test-dir build --output-on-failure --timeout 120 --no-tests=error
 
       - name: Install topo-v8
         run: cmake --install build --prefix "${RUNNER_TEMP}/v8-install"
