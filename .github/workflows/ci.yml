@@ -112,10 +112,22 @@ jobs:
         run: cmake --build build
 
       - name: Test
-        # --no-tests=error: a 0-tests build FAILS (no silent 0-tests green).
-        # TOPO_V8_BUILD_TESTS=ON registers the 22 TsServer + Debug cases that
-        # the standalone CI previously never built.
-        run: ctest --test-dir build --output-on-failure --timeout 120 --no-tests=error
+        run: |
+          # Windows: MinGW-built test exes are launched at ctest time (PRE_TEST
+          # gtest discovery); put the build-time gcc bin dir FIRST on PATH so
+          # its matching libstdc++-6 / libgcc_s_seh-1 / libwinpthread-1 resolve
+          # (a stale Git/Strawberry libstdc++ otherwise shadows it →
+          # 0xC0000139 STATUS_ENTRYPOINT_NOT_FOUND). Mirrors topo-core's CI.
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cxx=$(grep -m1 '^CMAKE_CXX_COMPILER:' build/CMakeCache.txt | cut -d= -f2)
+            if [ -n "$cxx" ]; then
+              export PATH="$(cygpath -u "$(dirname "$cxx")"):${PATH}"
+            fi
+          fi
+          # --no-tests=error: a 0-tests build FAILS (no silent 0-tests green).
+          # TOPO_V8_BUILD_TESTS=ON registers the 22 TsServer + Debug cases that
+          # the standalone CI previously never built.
+          ctest --test-dir build --output-on-failure --timeout 120 --no-tests=error
 
       - name: Install topo-v8
         run: cmake --install build --prefix "${RUNNER_TEMP}/v8-install"
