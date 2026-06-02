@@ -7,6 +7,7 @@
 
 #include "SourceMapResolver.h"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -15,6 +16,23 @@
 namespace fs = std::filesystem;
 
 namespace {
+
+// Portable environment mutation — Windows has no POSIX setenv/unsetenv.
+void setEnvVar(const char* name, const char* value) {
+#ifdef _WIN32
+    _putenv_s(name, value);
+#else
+    ::setenv(name, value, /*overwrite=*/1);
+#endif
+}
+
+void unsetEnvVar(const char* name) {
+#ifdef _WIN32
+    _putenv_s(name, "");
+#else
+    ::unsetenv(name);
+#endif
+}
 
 fs::path makeTempDir(const std::string& tag) {
     fs::path base = fs::temp_directory_path() /
@@ -192,7 +210,7 @@ TEST(SourceMapResolverTest, CacheEvictsLruEntriesPastCapacity) {
     // Tight cap so the test does not need to construct hundreds of
     // fixtures; matches what an LSP-server caller would do to bound
     // memory in a long-running session.
-    ::setenv("TOPO_V8_SOURCEMAP_CACHE", "4", /*overwrite=*/1);
+    setEnvVar("TOPO_V8_SOURCEMAP_CACHE", "4");
     topo::v8::debug::SourceMapResolver r;
 
     // Prime the victim entry.
@@ -226,5 +244,5 @@ TEST(SourceMapResolverTest, CacheEvictsLruEntriesPastCapacity) {
     EXPECT_FALSE(vAfter.has_value())
         << "LRU should have evicted the victim entry past the cap";
 
-    ::unsetenv("TOPO_V8_SOURCEMAP_CACHE");
+    unsetEnvVar("TOPO_V8_SOURCEMAP_CACHE");
 }
