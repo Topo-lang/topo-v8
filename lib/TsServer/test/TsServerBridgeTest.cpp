@@ -112,13 +112,21 @@ class TsServerFindTypeDefTest : public ::testing::Test {
 protected:
     fs::path tmp;
     void SetUp() override {
-        // unique per-test temp dir
-        std::string tpl = (fs::temp_directory_path() / "topo-tsserver-test-XXXXXX").string();
-        std::vector<char> buf(tpl.begin(), tpl.end());
-        buf.push_back('\0');
-        char* p = mkdtemp(buf.data());
-        ASSERT_NE(p, nullptr);
-        tmp = fs::path(p);
+        // Unique per-test temp dir. Portable (Windows has no mkdtemp): pick a
+        // fresh name under the temp root and create it, retrying on collision.
+        std::error_code ec;
+        static int counter = 0;
+        const int seed = ::testing::UnitTest::GetInstance()->random_seed();
+        for (int attempt = 0; attempt < 256; ++attempt) {
+            fs::path candidate = fs::temp_directory_path() /
+                ("topo-tsserver-test-" + std::to_string(seed) + "-" +
+                 std::to_string(++counter));
+            if (fs::create_directory(candidate, ec) && !ec) {
+                tmp = candidate;
+                break;
+            }
+        }
+        ASSERT_FALSE(tmp.empty()) << "failed to create a unique temp dir";
     }
     void TearDown() override {
         std::error_code ec;
