@@ -53,9 +53,11 @@ add_subdirectory(lib)
 # run ONLY in the meta full-stack build (via the meta-root's explicit
 # add_subdirectory) — the per-repo public CI built topo-v8 with no tests and
 # passed green ("No tests were found!!!"). This self-gate lets the standalone
-# CI run the 22 cases. It stays DORMANT in the meta build (TOPO_V8_BUILD_TESTS
-# defaults OFF there, so the meta's explicit adds remain the single source —
-# no double-add).
+# CI run the 22 cases. In the meta full-stack build it is now the SINGLE source
+# of these suites too: the meta FORCEs TOPO_V8_BUILD_TESTS ON (alongside
+# TOPO_META_DRIVING_TESTS), so this gate fires inside topo-v8's own project()
+# scope and the meta no longer carries an explicit add_subdirectory for them
+# (an explicit meta add on top of the forced-ON gate would double-add).
 option(TOPO_V8_BUILD_TESTS "Build topo-v8 tests" OFF)
 if(TOPO_V8_BUILD_TESTS AND (PROJECT_IS_TOP_LEVEL OR TOPO_META_DRIVING_TESTS))
     enable_testing()
