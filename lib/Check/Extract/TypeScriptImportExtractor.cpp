@@ -83,8 +83,9 @@ std::vector<HostImport> TypeScriptImportExtractor::extractImports(const std::str
     while (std::getline(file, line)) {
         ++lineNum;
 
+        // Retain code before a mid-line `/*` so a trailing-comment import line
+        // is still matched.
         std::string processed = stripBlockCommentState(line, inBlockComment);
-        if (inBlockComment) continue;
         processed = stripLineComment(processed);
 
         // Skip blank lines and comment-only lines.

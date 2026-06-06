@@ -112,8 +112,8 @@ std::unordered_set<std::string> collectGlobals(const std::string& filePath) {
     std::string line;
 
     while (std::getline(file, line)) {
+        // Retain code before a mid-line `/*` so brace/scope state stays in sync.
         std::string processed = stripBlockCommentState(line, inBlockComment);
-        if (inBlockComment) continue;
         processed = stripLineComment(processed);
         if (processed.find_first_not_of(" \t\r\n") == std::string::npos) continue;
 
@@ -165,8 +165,18 @@ std::vector<SymbolAccess> TypeScriptSymbolAccessExtractor::extractSymbolAccesses
     if (!file.is_open()) return results;
 
     static const auto scopePatterns = buildScopePatterns();
+    // Class-method shorthand, including getter/setter, generator, `#private`
+    // and computed names, with an optional `: ReturnType` annotation — so the
+    // method body opens a function scope and writes inside it are attributed.
     static const std::regex methodRegex(
-        R"(^\s*(?:(?:public|private|protected)\s+)?(?:static\s+)?(?:async\s+)?(\w+)\s*\([^)]*\)\s*\{)");
+        R"(^\s*(?:(?:public|private|protected)\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:(?:get|set)\s+)?\*?\s*(#?\w+|\[[^\]]+\])\s*\([^)]*\)\s*(?::\s*[^{]+?)?\{)");
+    // Class-field arrow method: `name = (args) => { ... }` etc. (with an
+    // optional `: Type` annotation that may be a function type containing an
+    // inner `=>`; anchored on the trailing `=> {`). These class-field arrows
+    // were not recognized as a function scope, so global writes inside them
+    // were dropped.
+    static const std::regex arrowMethodRegex(
+        R"(^\s*(?:(?:public|private|protected)\s+)?(?:static\s+)?(?:readonly\s+)?(#?\w+)\s*(?::\s*.+)?=\s*(?:async\s+)?(?:\([^)]*\)|\w+)\s*(?::\s*[^=]+?)?=>\s*\{\s*$)");
     // Well-known global-root writes: `globalThis.x = ...`, `window.foo = ...`,
     // `process.env.X = ...`, `global.bar = ...`.
     static const std::regex wellKnownWriteRegex(
@@ -178,19 +188,24 @@ std::vector<SymbolAccess> TypeScriptSymbolAccessExtractor::extractSymbolAccesses
     std::vector<ScopeEntry> scopeStack;
     int braceDepth = 0;
     bool inBlockComment = false;
+    bool inTemplate = false;  // multi-line template-literal state
     std::string line;
     int lineNum = 0;
 
     while (std::getline(file, line)) {
         ++lineNum;
 
+        // Retain code before a mid-line `/*` so brace/scope state stays in sync.
         std::string processed = stripBlockCommentState(line, inBlockComment);
-        if (inBlockComment) continue;
         processed = stripLineComment(processed);
-        if (processed.find_first_not_of(" \t\r\n") == std::string::npos) continue;
+        // A line wholly inside a multi-line template literal carries no live
+        // declarations; mask it (which clears it) so it neither matches a
+        // global write nor desyncs scope tracking.
+        if (!inTemplate &&
+            processed.find_first_not_of(" \t\r\n") == std::string::npos) continue;
 
         int lineStartDepth = braceDepth;
-        std::string masked = maskStringLiterals(processed);
+        std::string masked = maskStringLiterals(processed, inTemplate);
 
         // Scope bookkeeping.
         bool openedScope = false;
@@ -205,9 +220,11 @@ std::vector<SymbolAccess> TypeScriptSymbolAccessExtractor::extractSymbolAccesses
         }
         if (!openedScope && !scopeStack.empty() && scopeStack.back().isClass) {
             std::smatch m;
-            if (std::regex_search(processed, m, methodRegex)) {
+            bool matched = std::regex_search(processed, m, methodRegex) ||
+                           std::regex_search(processed, m, arrowMethodRegex);
+            if (matched) {
                 std::string name = m[1].str();
-                if (!isReserved(name)) {
+                if (!name.empty() && !isReserved(name)) {
                     scopeStack.push_back({name, lineStartDepth,
                                           /*isClass=*/false, /*isFunction=*/true});
                     openedScope = true;
@@ -385,7 +402,9 @@ std::vector<SymbolAccess> TypeScriptSymbolAccessExtractor::extractSymbolAccesses
             }
         }
 
-        auto [opens, closes] = countBraces(processed);
+        // Count braces on the masked text so a `{`/`}` inside a (possibly
+        // multi-line) template literal does not desync scope depth.
+        auto [opens, closes] = countBraces(masked);
         braceDepth += opens;
         braceDepth -= closes;
         if (braceDepth < 0) braceDepth = 0;

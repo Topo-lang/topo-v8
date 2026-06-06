@@ -145,8 +145,9 @@ collectDestructuredImports(const std::string& filePath) {
     bool inBlockComment = false;
     std::string line;
     while (std::getline(file, line)) {
+        // Retain code before a mid-line `/*` so a trailing-comment import line
+        // is still matched.
         std::string processed = stripBlockCommentState(line, inBlockComment);
-        if (inBlockComment) continue;
         processed = stripLineComment(processed);
 
         std::smatch m;
@@ -240,8 +241,8 @@ std::vector<CallEdge> TypeScriptCallEdgeExtractor::extractCallEdges(const std::s
     while (std::getline(file, line)) {
         ++lineNum;
 
+        // Retain code before a mid-line `/*` so brace/scope state stays in sync.
         std::string processed = stripBlockCommentState(line, inBlockComment);
-        if (inBlockComment) continue;
         processed = stripLineComment(processed);
         if (processed.find_first_not_of(" \t\r\n") == std::string::npos) continue;
 

@@ -173,9 +173,20 @@ std::vector<DetectedCallSite> TypeScriptCallSiteExtractor::extractCallSites(cons
     // Method shorthand inside class body: `NAME(args) { ... }` with optional
     // visibility modifier and `static` / `async`. Tolerates an optional
     // `: ReturnType` annotation between `)` and `{` — TypeScript class methods
-    // routinely carry one.
+    // routinely carry one. Also recognizes getter/setter (`get x()` /
+    // `set x(v)`), generator (`*gen()`), `#private` names, and computed
+    // (`[Symbol.iterator]()`) members so their bodies open a function scope
+    // (otherwise dangerous calls inside them are misattributed to the class).
     static const std::regex methodRegex(
-        R"(^\s*(?:(?:public|private|protected)\s+)?(?:static\s+)?(?:async\s+)?(\w+)\s*\([^)]*\)\s*(?::\s*[^{]+?)?\{)");
+        R"(^\s*(?:(?:public|private|protected)\s+)?(?:static\s+)?(?:readonly\s+)?(?:async\s+)?(?:(?:get|set)\s+)?\*?\s*(#?\w+|\[[^\]]+\])\s*\([^)]*\)\s*(?::\s*[^{]+?)?\{)");
+    // Class-field arrow method: `name = (args) => { ... }`,
+    // `name = async (args) => { ... }`, or `name = arg => { ... }`, with an
+    // optional `: Type` annotation on the field (which may itself be a
+    // function type containing `=>`). Anchored on the trailing `=> {` so the
+    // annotation's inner `=>` doesn't break the match. Its body is a function
+    // scope (so calls inside it aren't misattributed to the class).
+    static const std::regex arrowMethodRegex(
+        R"(^\s*(?:(?:public|private|protected)\s+)?(?:static\s+)?(?:readonly\s+)?(#?\w+)\s*(?::\s*.+)?=\s*(?:async\s+)?(?:\([^)]*\)|\w+)\s*(?::\s*[^=]+?)?=>\s*\{\s*$)");
 
     std::vector<ScopeEntry> scopeStack;
     int braceDepth = 0;
@@ -186,8 +197,9 @@ std::vector<DetectedCallSite> TypeScriptCallSiteExtractor::extractCallSites(cons
     while (std::getline(file, line)) {
         ++lineNum;
 
+        // stripBlockCommentState retains code before a mid-line `/*`; process
+        // it rather than dropping the whole line when block state stays open.
         std::string processed = stripBlockCommentState(line, inBlockComment);
-        if (inBlockComment) continue;
         processed = stripLineComment(processed);
         if (processed.find_first_not_of(" \t\r\n") == std::string::npos) continue;
 
@@ -208,13 +220,15 @@ std::vector<DetectedCallSite> TypeScriptCallSiteExtractor::extractCallSites(cons
         // Method shorthand only inside class body.
         if (!openedScope && !scopeStack.empty() && scopeStack.back().isClass) {
             std::smatch m;
-            if (std::regex_search(processed, m, methodRegex)) {
+            bool matched = std::regex_search(processed, m, methodRegex) ||
+                           std::regex_search(processed, m, arrowMethodRegex);
+            if (matched) {
                 std::string name = m[1].str();
                 // Skip reserved keywords / control flow tokens that match.
                 static const std::vector<std::string> kws = {
                     "if", "for", "while", "switch", "return", "catch",
                     "do", "try", "else"};
-                bool skip = false;
+                bool skip = name.empty();
                 for (const auto& k : kws) if (name == k) { skip = true; break; }
                 if (!skip) {
                     scopeStack.push_back({name, lineStartDepth,

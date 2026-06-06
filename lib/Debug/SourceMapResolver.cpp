@@ -81,7 +81,12 @@ bool parseSourceMap(const std::string& text,
         return false;
     }
     if (!doc.is_object()) return false;
-    if (!doc.contains("version") || doc["version"].get<int>() != 3) {
+    // Honor the resolver's documented no-throw contract: `version` may exist
+    // with a non-integer JSON type (`"3"`, `3.0`, `null`). `get<int>()` on a
+    // wrong-typed value throws `json::type_error`; gate on an integral type
+    // so a malformed `.map` fails closed (returns false) instead of unwinding.
+    if (!doc.contains("version") || !doc["version"].is_number_integer() ||
+        doc["version"].get<int>() != 3) {
         return false;
     }
     if (!doc.contains("mappings") || !doc["mappings"].is_string()) {

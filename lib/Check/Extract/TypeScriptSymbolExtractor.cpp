@@ -121,8 +121,11 @@ std::vector<HostSymbol> TypeScriptSymbolExtractor::extractSymbols(const std::str
     while (std::getline(file, line)) {
         ++lineNum;
 
+        // stripBlockCommentState now returns the code text that precedes a
+        // mid-line `/*` (and is string/`//`-aware), so we must NOT discard the
+        // line just because block-comment state is now open — the retained
+        // prefix may carry a real declaration. Only skip when nothing remains.
         std::string processed = stripBlockCommentState(line, inBlockComment);
-        if (inBlockComment) continue;  // rest of line is still comment
         processed = stripLineComment(processed);
         if (processed.find_first_not_of(" \t\r") == std::string::npos) continue;
 

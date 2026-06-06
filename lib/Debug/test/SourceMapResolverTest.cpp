@@ -124,6 +124,34 @@ TEST(SourceMapResolverTest, MalformedMapReturnsNullopt) {
     EXPECT_FALSE(y.has_value());
 }
 
+// Regression: a `version` field that EXISTS but holds a non-integer JSON
+// type (string / float / null) previously reached `doc["version"].get<int>()`
+// and threw json::type_error, violating the resolver's documented no-throw
+// contract. It must now fail closed (nullopt) without throwing.
+TEST(SourceMapResolverTest, WrongTypedVersionFailsClosedWithoutThrowing) {
+    fs::path tmp = makeTempDir("badversion");
+    topo::v8::debug::SourceMapResolver r;
+
+    struct Case { const char* tag; const char* version; };
+    const Case cases[] = {
+        {"strver", R"("3")"},   // string instead of integer
+        {"floatver", "3.0"},    // float instead of integer
+        {"nullver", "null"},    // null
+        {"objver", "{}"},       // object
+    };
+    for (const auto& c : cases) {
+        fs::path js = tmp / (std::string(c.tag) + ".js");
+        fs::path map = tmp / (std::string(c.tag) + ".js.map");
+        writeFile(js, "// generated\n");
+        writeFile(map, std::string("{\"version\": ") + c.version +
+                           ", \"sources\": [\"x.ts\"], \"mappings\": \"AAAA\"}");
+        std::optional<topo::v8::debug::ResolvedFrame> res;
+        // The contract is no-throw: assert the call does not throw at all.
+        ASSERT_NO_THROW(res = r.resolve(js.string(), 1, 1)) << "tag=" << c.tag;
+        EXPECT_FALSE(res.has_value()) << "tag=" << c.tag;
+    }
+}
+
 TEST(SourceMapResolverTest, SearchRootIsConsulted) {
     fs::path tmp = makeTempDir("searchroot");
     fs::path js = tmp / "no-sibling.js";
