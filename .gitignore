@@ -32,6 +32,10 @@ Testing/
 .DS_Store
 Thumbs.db
 
+# Node / JS tooling (transform tools, tsserver bridge)
+node_modules/
+*.tsbuildinfo
+
 # Python (test scratch only)
 __pycache__/
 *.pyc
