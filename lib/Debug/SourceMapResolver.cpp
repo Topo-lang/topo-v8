@@ -10,6 +10,7 @@
 #include "SourceMapResolver.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -42,7 +43,13 @@ int base64Char(char c) {
 // (the MSB). The least-significant data bit of the first group is the
 // sign bit. Groups are emitted in little-endian order.
 bool decodeVLQ(const std::string& s, size_t& pos, int& outValue) {
-    int result = 0;
+    // Accumulate into a 64-bit UNSIGNED value. A valid VLQ field never needs
+    // more than 32 bits, but a crafted/runaway map can chain extra
+    // continuation groups. Shifting an `int` by 30/35 (or wider) is UB
+    // (sign-bit overflow at shift 30, shift-past-width at shift >= 32), so we
+    // must (a) accumulate in a wide unsigned type and (b) bound the shift
+    // BEFORE every shift so the continuation never shifts past the type width.
+    uint64_t result = 0;
     int shift = 0;
     bool continuation = true;
     while (continuation) {
@@ -50,17 +57,25 @@ bool decodeVLQ(const std::string& s, size_t& pos, int& outValue) {
         int digit = base64Char(s[pos++]);
         if (digit < 0) return false;
         continuation = (digit & 0x20) != 0;
-        int data = digit & 0x1F;
-        result |= (data << shift);
+        uint32_t data = static_cast<uint32_t>(digit & 0x1F);
+        // Bound the shift up front. A valid 32-bit field fits in <= 7 groups
+        // (the 6th group's top bits already exceed 32 data bits, but tsc only
+        // emits up to ~32 bits, so cap at shift 35). Reject malformed VLQ
+        // gracefully rather than shifting past the accumulator width (UB).
+        if (shift >= 64) return false;
+        result |= (static_cast<uint64_t>(data) << shift);
         shift += 5;
         // Guard against malformed runaway VLQs (each int fits in 32 bits
         // in any valid map; refuse beyond ~7 groups).
         if (shift > 35) return false;
     }
-    // Recover signed value: LSB is the sign bit.
+    // Recover signed value: LSB is the sign bit. The magnitude occupies the
+    // remaining low bits and fits in 32 bits for any well-formed map; cast
+    // down to int only after dropping the sign bit.
     bool negative = (result & 1) != 0;
-    int magnitude = result >> 1;
-    outValue = negative ? -magnitude : magnitude;
+    uint64_t magnitude = result >> 1;
+    outValue = negative ? -static_cast<int>(magnitude)
+                        : static_cast<int>(magnitude);
     return true;
 }
 

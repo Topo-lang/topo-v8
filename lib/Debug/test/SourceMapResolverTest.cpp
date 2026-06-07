@@ -222,6 +222,41 @@ TEST(SourceMapResolverTest, VlqDecoderHandlesKnownSegments) {
     EXPECT_EQ(b->column_1indexed, 2); // col 1 0-indexed + 1
 }
 
+// Regression: a `mappings` string with a runaway VLQ (an unterminated chain
+// of continuation groups) previously executed `data << 35` / `data << 30` on a
+// 32-bit signed `int`, which is undefined behavior (shift past width / sign-bit
+// overflow). The decoder must now reject the malformed field gracefully —
+// failing the parse to a cached `ok=false` so resolve() returns nullopt — and
+// must not invoke UB or throw on the over-width shift.
+TEST(SourceMapResolverTest, MalformedRunawayVlqFailsClosedWithoutUB) {
+    fs::path tmp = makeTempDir("runawayvlq");
+    topo::v8::debug::SourceMapResolver r;
+
+    struct Case { const char* tag; const char* mappings; };
+    const Case cases[] = {
+        // All-continuation base64 chars (each '/' = 63 = 0x3F has the 0x20
+        // continuation bit set); a long run never terminates the field and
+        // would drive `shift` well past the int width if unguarded.
+        {"all_continue", "////////////////"},
+        // Mixed: a few real groups then a long continuation tail.
+        {"long_tail", "AAAA,/////////////"},
+        // A single overlong continuation run on the generated-column field.
+        {"overlong_first", "//////////"},
+    };
+    for (const auto& c : cases) {
+        fs::path js = tmp / (std::string(c.tag) + ".js");
+        fs::path map = tmp / (std::string(c.tag) + ".js.map");
+        writeFile(js, "// generated\n");
+        writeFile(map, std::string("{\"version\": 3, \"sources\": [\"x.ts\"], "
+                                   "\"names\": [], \"mappings\": \"") +
+                           c.mappings + "\"}");
+        std::optional<topo::v8::debug::ResolvedFrame> res;
+        // The decoder must not invoke UB / throw on the over-width shift.
+        ASSERT_NO_THROW(res = r.resolve(js.string(), 1, 1)) << "tag=" << c.tag;
+        EXPECT_FALSE(res.has_value()) << "tag=" << c.tag;
+    }
+}
+
 // LRU eviction: when more than `TOPO_V8_SOURCEMAP_CACHE` distinct
 // js_path entries are resolved, the oldest must be dropped from the
 // cache. We verify by deleting a `.map` file from disk, then driving
