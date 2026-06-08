@@ -77,6 +77,51 @@ std::string stripBlockCommentState(const std::string& line, bool& inBlockComment
     return v8scanner::stripBlockCommentState(line, inBlockComment);
 }
 
+/// Split a `const`/`let`/`var` declarator list into the leading identifier of
+/// each top-level declarator, so `a = 1, b = 2` yields {"a", "b"} — matching the
+/// AST extractor, which lifts every declarator. Commas inside initializers
+/// (calls `f(1, 2)`, arrays `[1, 2]`, objects `{x: 1}`, and string/template
+/// literals) are NOT separators, so bracket depth and string state are tracked.
+/// A segment whose leading token is not a plain identifier (destructuring
+/// `{a, b}` / `[a, b]`) is skipped — best-effort L1 behavior, identical to the
+/// historical first-declarator-only regex which never matched those shapes.
+std::vector<std::string> extractTopLevelDeclaratorNames(const std::string& tail) {
+    auto isIdentStart = [](char c) {
+        return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c == '_';
+    };
+    auto isIdentCont = [&](char c) { return isIdentStart(c) || (c >= '0' && c <= '9'); };
+
+    std::vector<std::string> names;
+    auto flush = [&](const std::string& seg) {
+        size_t i = seg.find_first_not_of(" \t\r\n");
+        if (i == std::string::npos || !isIdentStart(seg[i])) return;
+        size_t j = i;
+        while (j < seg.size() && isIdentCont(seg[j])) ++j;
+        names.push_back(seg.substr(i, j - i));
+    };
+
+    std::string seg;
+    int depth = 0;
+    char strCh = 0;  // active string delimiter, 0 when outside a string/template
+    for (size_t k = 0; k < tail.size(); ++k) {
+        char c = tail[k];
+        if (strCh) {
+            seg += c;
+            if (c == '\\' && k + 1 < tail.size()) seg += tail[++k];
+            else if (c == strCh) strCh = 0;
+            continue;
+        }
+        if (c == '\'' || c == '"' || c == '`') { strCh = c; seg += c; continue; }
+        if (c == '(' || c == '[' || c == '{') { ++depth; seg += c; continue; }
+        if (c == ')' || c == ']' || c == '}') { if (depth) --depth; seg += c; continue; }
+        if (depth == 0 && c == ';') break;                 // end of statement
+        if (depth == 0 && c == ',') { flush(seg); seg.clear(); continue; }
+        seg += c;
+    }
+    flush(seg);
+    return names;
+}
+
 } // namespace
 
 std::vector<HostSymbol> TypeScriptSymbolExtractor::extractSymbols(const std::string& filePath) {
@@ -94,8 +139,10 @@ std::vector<HostSymbol> TypeScriptSymbolExtractor::extractSymbols(const std::str
         R"(^\s*export\s+interface\s+(\w+))");
     static const std::regex exportTypeAliasRegex(
         R"(^\s*export\s+type\s+(\w+)\s*=)");
+    // Capture the whole declarator list (not just the first name) so a
+    // multi-declarator `export const a = 1, b = 2;` lifts every declarator.
     static const std::regex exportVarRegex(
-        R"(^\s*export\s+(?:const|let|var)\s+(\w+))");
+        R"(^\s*export\s+(?:const|let|var)\s+(.+))");
     static const std::regex exportNamespaceRegex(
         R"(^\s*export\s+(?:namespace|module)\s+(\w+))");
     static const std::regex exportListRegex(
@@ -185,14 +232,18 @@ std::vector<HostSymbol> TypeScriptSymbolExtractor::extractSymbols(const std::str
                 sym.hostVisibility = Visibility::Public;
                 result.push_back(std::move(sym));
             } else if (std::regex_search(processed, m, exportVarRegex)) {
-                HostSymbol sym;
-                sym.simpleName = m[1].str();
-                sym.qualifiedName = buildQualifiedName(scopeStack, sym.simpleName);
-                sym.kind = HostSymbolKind::Variable;
-                sym.file = filePath;
-                sym.line = lineNum;
-                sym.hostVisibility = Visibility::Public;
-                result.push_back(std::move(sym));
+                // One Variable symbol per declarator — consistent with the AST
+                // extractor regardless of which extractor is on PATH.
+                for (const auto& name : extractTopLevelDeclaratorNames(m[1].str())) {
+                    HostSymbol sym;
+                    sym.simpleName = name;
+                    sym.qualifiedName = buildQualifiedName(scopeStack, name);
+                    sym.kind = HostSymbolKind::Variable;
+                    sym.file = filePath;
+                    sym.line = lineNum;
+                    sym.hostVisibility = Visibility::Public;
+                    result.push_back(std::move(sym));
+                }
             } else if (std::regex_search(processed, m, exportNamespaceRegex)) {
                 // Namespaces are scope containers, not host symbols -- they
                 // parallel C++ `namespace` and Java `package`, not Java
