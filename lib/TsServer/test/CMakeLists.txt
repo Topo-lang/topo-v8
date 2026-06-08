@@ -19,4 +19,4 @@ target_include_directories(topo-v8-tsserver-tests PRIVATE
 )
 topo_set_compiler_flags(topo-v8-tsserver-tests)
 gtest_discover_tests(topo-v8-tsserver-tests DISCOVERY_TIMEOUT 30
-    PROPERTIES LABELS "toolchain;topo-v8;topo-v8-tsserver" TIMEOUT 30)
+    PROPERTIES LABELS "toolchain\;topo-v8\;topo-v8-tsserver" TIMEOUT 30)
