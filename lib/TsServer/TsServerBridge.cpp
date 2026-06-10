@@ -10,7 +10,6 @@
 
 #include "TsServerBridge.h"
 
-#include "topo/Platform/Platform.h"
 #include "topo/Platform/Process.h"
 
 #include <fstream>
@@ -24,7 +23,12 @@ TsServerBridge::TsServerBridge() : LSPBridge("[tsserver] ") {}
 
 bool TsServerBridge::isTsServerAvailable() {
     namespace plat = topo::platform;
-    std::string exe = "typescript-language-server" + std::string(plat::ExeSuffix);
+    // Bare name, no ExeSuffix: npm global installs ship the launcher as
+    // `typescript-language-server.cmd` (a batch shim) on Windows, never a
+    // `.exe` — appending ".exe" guaranteed a miss. The platform spawn layer
+    // (runProcessCapture / PipedProcess) resolves bare names on PATH probing
+    // .exe/.cmd/.bat and routes batch launchers through cmd.exe.
+    std::string exe = "typescript-language-server";
     // Shell-probe hardening:
     // the previous probe composed a shell command (``"exe" --version > /dev/null
     // 2>&1``) and called ``std::system``. That spawned a shell with quoted-
@@ -44,14 +48,14 @@ bool TsServerBridge::start(const std::string& rootUri) {
 }
 
 bool TsServerBridge::start(const std::string& tsServerPath, const std::string& rootUri) {
-    namespace plat = topo::platform;
-
     std::string exe = tsServerPath;
     if (exe.empty()) {
         // Default to the official tsserver LSP wrapper on $PATH. npm global
         // installs drop `typescript-language-server` onto PATH directly; we
-        // do not hardcode any npm prefix.
-        exe = "typescript-language-server" + std::string(plat::ExeSuffix);
+        // do not hardcode any npm prefix. Bare name, no ExeSuffix: on
+        // Windows npm stages a `.cmd` batch shim (no `.exe` exists), which
+        // the platform spawn layer resolves and runs via cmd.exe.
+        exe = "typescript-language-server";
     }
 
     std::vector<std::string> args = {"--stdio"};
