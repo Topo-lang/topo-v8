@@ -32,6 +32,23 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Set up Node.js 22 (tsserver host)
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      # typescript-language-server is the binary TsServerBridge probes for;
+      # it resolves the `typescript` package (tsserver proper) from the
+      # global install beside it. Installed on every leg so the
+      # TsServerBridgeLive cases RUN instead of GTEST_SKIP — the assert
+      # step after Test converts a skip into a hard failure. windows-2022
+      # exercises the bare-name spawn through the npm `.cmd` shim.
+      - name: Install typescript-language-server (live TsServerBridge host server)
+        run: |
+          npm i -g typescript-language-server typescript
+          command -v typescript-language-server
+          typescript-language-server --version
+
       - name: Install build deps (linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq ninja-build
@@ -63,7 +80,10 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/topo-install
-          key: topo-core-${{ env.TOPO_CORE_REF }}-lang-${{ env.TOPO_LANG_REF }}-${{ matrix.os }}-v2
+          # -v3: the refs are literal branch names, so bump the suffix when
+          # newer upstream content is required — here topo-core's .cmd/.bat
+          # launcher resolution, which the Windows live-tsserver spawn needs.
+          key: topo-core-${{ env.TOPO_CORE_REF }}-lang-${{ env.TOPO_LANG_REF }}-${{ matrix.os }}-v3
 
       - name: Build & install topo-core (zero-LLVM, lang-less)
         if: steps.upstream-cache.outputs.cache-hit != 'true'
@@ -128,6 +148,33 @@ jobs:
           # TOPO_V8_BUILD_TESTS=ON registers the 22 TsServer + Debug cases that
           # the standalone CI previously never built.
           ctest --test-dir build --output-on-failure --timeout 120 --no-tests=error
+
+      - name: Assert TsServer live round-trips ran (named cases, skip != pass)
+        # The TsServerBridgeLive cases GTEST_SKIP() when
+        # typescript-language-server is absent — so a green Test step can
+        # mean "every live case skipped". Re-run the suite through
+        # .github/scripts/assert-live-cases.sh (strict: any skip fails) and
+        # FAIL unless every named case below lands in the gtest passed set
+        # (exact-name match on the '[       OK ]' line). Renaming or
+        # filtering out a named case turns this step red (ABSENT
+        # diagnostic) until the list is updated — intended. The server is
+        # installed unconditionally above, so the assertion covers the
+        # whole matrix; windows-2022 proves the bare-name `.cmd` shim
+        # spawn path through the platform process layer.
+        run: |
+          # Windows: same libstdc++ PATH fix as the Test step — the script
+          # execs the MinGW-built exe directly.
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cxx=$(grep -m1 '^CMAKE_CXX_COMPILER:' build/CMakeCache.txt | cut -d= -f2)
+            if [ -n "$cxx" ]; then
+              export PATH="$(cygpath -u "$(dirname "$cxx")"):${PATH}"
+            fi
+          fi
+          bash .github/scripts/assert-live-cases.sh strict topo-v8-tsserver-tests \
+            TsServerBridgeLive.StartInitializeStop \
+            TsServerBridgeLive.HoverRoundTrip \
+            TsServerBridgeLive.DefinitionRoundTrip \
+            TsServerBridgeLive.FindDefinitionViaWorkspaceSymbol
 
       - name: Install topo-v8
         run: cmake --install build --prefix "${RUNNER_TEMP}/v8-install"
