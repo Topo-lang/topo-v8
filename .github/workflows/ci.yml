@@ -45,7 +45,7 @@ jobs:
       # exercises the bare-name spawn through the npm `.cmd` shim.
       - name: Install typescript-language-server (live TsServerBridge host server)
         run: |
-          npm i -g typescript-language-server typescript
+          npm i -g typescript-language-server typescript@5
           command -v typescript-language-server
           typescript-language-server --version
 
